@@ -8,6 +8,7 @@ import org.scalajs.dom.raw
 
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
+import org.scalajs.dom.raw.HTMLImageElement
 
 
 // drawing editor app
@@ -35,6 +36,8 @@ object DrawingEditor {
   // drawing with shape
   var curShapeSet = false
   var curShape = "None"
+
+  var curPattern = "None"
 
   def getCanvas(): html.Canvas ={
     document.getElementById("editor-canvas").asInstanceOf[html.Canvas]
@@ -197,6 +200,14 @@ object DrawingEditor {
   def drawPolygon(ctx: dom.CanvasRenderingContext2D, sides: Int): Unit = {
     ctx.putImageData(oldImgData, 0, 0)
     ctx.strokeStyle = curColor
+    if (curPattern !="None"){
+      var image = dom.document.createElement("img").asInstanceOf[HTMLImageElement]
+      image.src = curPattern
+      image.onload = (e: dom.Event) => {
+        val ptrn = ctx.createPattern(image, "repeat")
+        ctx.strokeStyle = ptrn
+      }
+    }
     ctx.lineWidth = curLineSize
 
     val x = clickX(0)
@@ -272,6 +283,19 @@ object DrawingEditor {
     document.body.appendChild(colButton)
   }
 
+  def makePatternButton(pattern: String): Unit ={
+    val patternButton = document.createElement("button")
+    patternButton.setAttribute("id", pattern+"Button")
+    //patternButton.setAttribute("style", "backgound-color : "+color)
+    patternButton.textContent = pattern
+    patternButton.addEventListener("click", { (e: dom.MouseEvent) =>
+      if (pattern == "leaves") {
+        curPattern = "images/leaf-1498985_640.jpg"
+      }
+    })
+    document.body.appendChild(patternButton)
+  }
+
   def makeSizeButton(size: Int, text: String): Unit ={
     val sizeButton = document.createElement("button")
     sizeButton.setAttribute("id", "size"+text+"Button")
@@ -337,6 +361,10 @@ object DrawingEditor {
     makeColorButton("black")
     makeColorButton("brown")
     makeColorButton("pink")
+
+    document.body.appendChild(document.createElement("br"))
+
+    makePatternButton("leaves")
 
     document.body.appendChild(document.createElement("br"))
 
