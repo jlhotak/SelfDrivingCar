@@ -6,31 +6,23 @@
 import scala.scalajs.js.annotation.JSExport
 import scala.scalajs.js.annotation.JSExportTopLevel
 import org.scalajs.dom
-import org.scalajs.dom.{ImageData, Node, document, html, window}
-import org.scalajs.dom.raw
+import org.scalajs.dom.{ document, html, window}
+
 
 import scala.collection.mutable.ListBuffer
-import scala.util.Random
-import org.scalajs.dom.raw.{HTMLCanvasElement, HTMLImageElement}
+import org.scalajs.dom.raw.{HTMLImageElement}
 import scalatags.JsDom.all._
-import scalatags.JsDom.svgTags._
+
 
 import scala.scalajs.js
-import upickle.default._
-
-import scala.collection.mutable
 
 
 
-
-
-// czec phrasbook app
 @JSExportTopLevel("ScalaSelfDrivingCar")
 object ScalaSelfDrivingCar {
 
-  //var ctx = Option(dom.CanvasRenderingContext2D)
-  //var car = Option(Car)
-  var bestCar : Car = null
+  var bestCar : Option[Car] = None: Option[Car]
+
 
   @JSExport
   def main(): Unit = {
@@ -75,7 +67,7 @@ object ScalaSelfDrivingCar {
     var cars = generateCars(N, road)
 
 
-    bestCar = cars(0)
+    bestCar = Some(cars(0))
 
     val saveButton = button("Save").render
 
@@ -91,12 +83,12 @@ object ScalaSelfDrivingCar {
 
     if (window.localStorage.getItem("bestBrain") != null){
       println("bestBrain != null")
-      bestCar = cars(0)
+      bestCar = Some(cars(0))
       var a = 0
       for (a <- 0 until cars.length){
-        cars(a).brain = retrieve(bestCar)
+        cars(a).brain = Some(retrieve())
         if (a != 0){
-          NeuralNetwork.mutate(cars(a).brain, 0.12)
+          NeuralNetwork.mutate(cars(a).brain.get, 0.12)
         }
       }
     }
@@ -128,7 +120,7 @@ object ScalaSelfDrivingCar {
 
   }
 
-  def retrieve(bestCar : Car): NeuralNetwork = {
+  def retrieve(): NeuralNetwork = {
     println("trying to retrive brain ")
    // var best = bestCar
     var inString = window.localStorage.getItem("bestBrain")
@@ -194,13 +186,13 @@ object ScalaSelfDrivingCar {
   }
 
   def save(/*bestCar : Car*/): Unit ={
-    println("SAVING CAR "+bestCar.brain.levels(0))
+    println("SAVING CAR "+bestCar.get.brain.get.levels(0))
     var a = 0
     var outString = "{\"levels\":["
 
-    for (a <- 0 until bestCar.brain.levels.length){
-      outString += bestCar.brain.levels(0).getLevelJSON(a)
-      if (a != bestCar.brain.levels.length - 1) {
+    for (a <- 0 until bestCar.get.brain.get.levels.length){
+      outString += bestCar.get.brain.get.levels(0).getLevelJSON(a)
+      if (a != bestCar.get.brain.get.levels.length - 1) {
         outString += ","
       }
     }
@@ -238,12 +230,12 @@ object ScalaSelfDrivingCar {
     var yVals = cars.map(c=>c.y)
     var yMin = yVals.min
 
-    bestCar = cars.find(c=>c.y==yMin).get
+    bestCar = Some(cars.find(c=>c.y==yMin).get)
     //car.update(road.borders, traffic)
     document.getElementById("road").setAttribute("height", window.innerHeight.toString)
 
     carCtx.save()
-    carCtx.translate(0, -bestCar.y + document.getElementById("road").clientHeight * 0.7)
+    carCtx.translate(0, -bestCar.get.y + document.getElementById("road").clientHeight * 0.7)
 
     road.draw(carCtx)
 
@@ -256,12 +248,12 @@ object ScalaSelfDrivingCar {
       cars(a).draw(carCtx, "blue")
     }
     carCtx.globalAlpha = 1
-    bestCar.draw(carCtx, "blue", true)
+    bestCar.get.draw(carCtx, "blue", true)
 
     carCtx.restore()
 
     networkCtx.lineDashOffset = -timestamp /50
-    Visualizer.drawNetwork(networkCtx, bestCar.brain)
+    Visualizer.drawNetwork(networkCtx, bestCar.get.brain.get)
 
     window.requestAnimationFrame(animate(_, cars, traffic, road, carCtx, networkCtx))
   }
@@ -274,15 +266,16 @@ object ScalaSelfDrivingCar {
 class Car(var x: Double, var y: Double, var width: Double, var height: Double, controlType: String,
           initSpeed : Double = 3.0, carColor: String = "blue"){
 
-  var sensor : Sensor = null
-  var brain : NeuralNetwork = null
+  var sensor : Option[Sensor] = None
+  var brain : Option[NeuralNetwork] = None
   if (controlType != "DUMMY") {
-    sensor = new Sensor(this)
+    sensor = Some(new Sensor(this))
     var args = new ListBuffer[Int]()
-    args += sensor.rayCount
+
+    args += sensor.get.rayCount
     args += 6
     args += 4
-    brain = new NeuralNetwork(args)
+    brain = Some(new NeuralNetwork(args))
   }
   var controls = new Controls(controlType)
   var speed = 0.0
@@ -377,8 +370,8 @@ class Car(var x: Double, var y: Double, var width: Double, var height: Double, c
 
 
     //ctx.restore()*/
-    if (sensor != null && drawSensor) {
-      sensor.draw(ctx)
+    if (!sensor.isEmpty  && drawSensor) {
+      sensor.get.draw(ctx)
     }
   }
 
@@ -426,10 +419,10 @@ class Car(var x: Double, var y: Double, var width: Double, var height: Double, c
       polygon = createPolygon()
       damaged = assessDamage(borders, traffic)
     }
-    if (sensor != null) {
-      sensor.update(borders, traffic)
-      val offsets = sensor.readings.map(s => if (s == null) 0.0 else  1 - s._2)
-      val outputs = NeuralNetwork.feedForward(offsets, brain)
+    if (!sensor.isEmpty) {
+      sensor.get.update(borders, traffic)
+      val offsets = sensor.get.readings.map(s => if (s == null) 0.0 else  1 - s._2)
+      val outputs = NeuralNetwork.feedForward(offsets, brain.get)
       //println("outputs in Car.update: "+outputs)
 
       if (useBrain){
